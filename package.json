@@ -1,0 +1,21 @@
+{
+  "name": "gestion-obras",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Gestion de Obras - Presupuestos de Construccion",
+  "workspaces": [
+    "packages/shared",
+    "packages/client"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w packages/client",
+    "build": "npm run build -w packages/shared && npm run build -w packages/client",
+    "build:shared": "npm run build -w packages/shared",
+    "build:client": "npm run build -w packages/client",
+    "lint": "eslint packages/*/src --ext .ts,.tsx"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.0"
+  }
+}
