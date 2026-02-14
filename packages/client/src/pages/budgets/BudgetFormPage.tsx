@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Form, Input, Select, InputNumber, Button, Table, Space, Typography, Row, Col, Statistic, DatePicker, Divider, App } from 'antd';
 import { PlusOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { budgetsService } from '../../services/budgets.service';
 import { clientsService } from '../../services/clients.service';
@@ -11,6 +11,7 @@ import { materialsService } from '../../services/materials.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatGuaranies } from '../../utils/format';
 import { COST_TYPE_LABELS } from '@gestion-obras/shared';
+import type { ImportResult } from '../../services/excel.service';
 
 const { Title } = Typography;
 
@@ -34,14 +35,18 @@ interface SectionState {
 export default function BudgetFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const { user } = useAuth();
   const isEditing = !!id;
 
+  const importData = (location.state as any)?.importData as ImportResult | undefined;
+
   const [sections, setSections] = useState<SectionState[]>([
     { key: 'sec-0', name: 'General', items: [] },
   ]);
+  const [importApplied, setImportApplied] = useState(false);
 
   const { data: budget } = useQuery({
     queryKey: ['budget', id],
@@ -63,6 +68,70 @@ export default function BudgetFormPage() {
     queryKey: ['units'],
     queryFn: () => materialsService.listUnits(),
   });
+
+  // Apply import data when recipes and units are loaded
+  useEffect(() => {
+    if (importData && recipesData && units && clientsData && !importApplied) {
+      setImportApplied(true);
+
+      // Set project name
+      if (importData.project_name) {
+        form.setFieldValue('project_name', importData.project_name);
+      }
+
+      // Try to match client by document number
+      if (importData.client_doc && clientsData) {
+        const client = clientsData.find((c: any) =>
+          c.document_number === importData.client_doc
+        );
+        if (client) {
+          form.setFieldValue('client_id', client.id);
+        }
+      }
+
+      // Build sections from import data
+      const newSections: SectionState[] = importData.sections.map((sec, si) => ({
+        key: `sec-import-${si}`,
+        name: sec.name,
+        items: sec.items.map((item, ii) => {
+          const row: BudgetItemRow = {
+            key: `item-import-${si}-${ii}`,
+            description: item.description,
+            unit_id: '',
+            quantity: item.quantity || 1,
+            material_unit_price: item.material_price || 0,
+            labor_unit_price: item.labor_price || 0,
+            margin_percentage: 0,
+          };
+
+          // Match unit code
+          if (item.unit_code && units) {
+            const unit = units.find((u: any) => u.code.toLowerCase() === item.unit_code.toLowerCase());
+            if (unit) row.unit_id = unit.id;
+          }
+
+          // Match recipe code
+          if (item.recipe_code && recipesData) {
+            const recipe = recipesData.find((r: any) => r.code.toUpperCase() === item.recipe_code!.toUpperCase());
+            if (recipe) {
+              row.recipe_id = recipe.id;
+              row.description = recipe.name;
+              row.unit_id = recipe.output_unit?.id || row.unit_id;
+              row.material_unit_price = recipe.total_material_cost || 0;
+              row.labor_unit_price = recipe.total_labor_cost || 0;
+              row.margin_percentage = recipe.margin_percentage || 0;
+            }
+          }
+
+          return row;
+        }),
+      }));
+
+      if (newSections.length > 0) {
+        setSections(newSections);
+      }
+    }
+  }, [importData, recipesData, units, clientsData, importApplied, form]);
 
   useEffect(() => {
     if (budget && isEditing) {

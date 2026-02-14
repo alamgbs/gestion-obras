@@ -68,7 +68,7 @@ export const budgetsService = {
 
   async changeStatus(id: string, newStatus: string, userId: string, notes?: string) {
     const { error } = await supabase.rpc('fn_change_budget_status', {
-      p_id: id, p_new_status: newStatus, p_user_id: userId, p_notes: notes ?? null,
+      p_id: id, p_new_status: newStatus, p_user_id: userId, p_notes: notes || '',
     });
     if (error) throw error;
   },

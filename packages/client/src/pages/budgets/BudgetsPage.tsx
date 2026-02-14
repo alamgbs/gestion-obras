@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Tabs, Popconfirm, App } from 'antd';
-import { PlusOutlined, SearchOutlined, FilePdfOutlined, FileExcelOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, FilePdfOutlined, FileExcelOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { budgetsService } from '../../services/budgets.service';
-import { exportBudgetToExcel, downloadTemplate as downloadTemplateFile } from '../../services/excel.service';
+import { exportBudgetToExcel, downloadTemplate as downloadTemplateFile, parseImportExcel } from '../../services/excel.service';
 import { formatGuaranies, formatDate } from '../../utils/format';
 import { BUDGET_STATUS_LABELS, BUDGET_STATUS_COLORS } from '@gestion-obras/shared';
 
@@ -25,6 +25,7 @@ export default function BudgetsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['budgets', page, search, statusFilter],
@@ -61,7 +62,7 @@ export default function BudgetsPage() {
   async function downloadExcel(id: string, budgetNumber: string) {
     try {
       const budget = await budgetsService.getById(id);
-      exportBudgetToExcel(budget);
+      await exportBudgetToExcel(budget);
     } catch {
       message.error('Error al descargar Excel');
     }
@@ -69,6 +70,20 @@ export default function BudgetsPage() {
 
   function downloadTemplate() {
     downloadTemplateFile();
+  }
+
+  async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await parseImportExcel(file);
+      message.success(`Importado: ${result.sections.length} secciones`);
+      navigate('/presupuestos/nuevo', { state: { importData: result } });
+    } catch (err: any) {
+      message.error(err.message || 'Error al importar Excel');
+    }
+    // Reset input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   const columns = [
@@ -106,12 +121,16 @@ export default function BudgetsPage() {
 
   return (
     <div>
+      <input type="file" ref={fileInputRef} accept=".xlsx,.xls" style={{ display: 'none' }}
+        onChange={handleImportExcel} />
+
       <div className="page-header">
         <Title level={3}>Presupuestos</Title>
         <Space>
           <Input placeholder="Buscar..." prefix={<SearchOutlined />} value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }} style={{ width: 250 }} allowClear />
-          <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>Plantilla Excel</Button>
+          <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>Plantilla</Button>
+          <Button icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()}>Importar Excel</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/presupuestos/nuevo')}>
             Nuevo Presupuesto
           </Button>
