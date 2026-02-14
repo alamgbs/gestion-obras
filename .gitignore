@@ -16,6 +16,9 @@ build/
 # Claude Code
 .claude/
 
+# Private instructions
+INSTRUCCIONES_WALTER.md
+
 # IDE
 .vscode/
 .idea/
