@@ -93,6 +93,7 @@ export const budgetsService = {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ budget_id: budgetId }),
@@ -103,26 +104,5 @@ export const budgetsService = {
       throw new Error(err.error);
     }
     return response.blob();
-  },
-
-  async importExcel(file: File) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-excel`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: formData,
-      }
-    );
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Error al importar' }));
-      throw new Error(err.error);
-    }
-    return response.json();
   },
 };
